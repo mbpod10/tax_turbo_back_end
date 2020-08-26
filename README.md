@@ -177,3 +177,17 @@ go to `http://localhost:3000/users`
 ];
 
 ```
+
+# Create Sessions Controller
+
+in `config/routes`
+
+```
+resources :sessions, :only [:create]
+```
+
+in `app/controllers/sessions_controller.rb`
+
+```
+
+```
