@@ -178,6 +178,27 @@ go to `http://localhost:3000/users`
 
 ```
 
+# Create Current User Concern
+
+- in `app/controllers/conerns/current_user_concern.rb`
+
+```
+
+module CurrentUserConcern
+    extend ActiveSupport::Concern
+    included do
+        before_action :set_current_user
+    end
+
+    def set_current_user
+        if session[:user_id]
+        #  @current_user = User.find(session[:user_id]).as_json(include: :information)
+        @current_user = User.find(session[:user_id])
+        end
+    end
+end
+```
+
 # Create Sessions Controller
 
 in `config/routes`
@@ -188,6 +209,122 @@ resources :sessions, :only [:create]
 
 in `app/controllers/sessions_controller.rb`
 
-```
+- with logic for login
 
 ```
+class SessionsController < ApplicationController
+    include CurrentUserConcern
+    def create
+        user = User
+            .find_by(email: params['user']['email'])
+            .try(:authenticate, params['user']['password'])
+
+
+        if user
+            session[:user_id] = user.id
+            render json: {
+                status: :created,
+                logged_in: true,
+                user: user
+        }
+        else
+            render json: {status: "Invalid Email or Password"}
+        end
+    end
+    def logged_in
+        if @current_user
+            render json: {
+                logged_in: true,
+                user: @current_user
+            }
+        else
+            render json: {
+                logged_in: false
+            }
+        end
+    end
+
+    def logout
+        reset_session
+        render json: {status: 200, logg_out: true}
+    end
+end
+```
+
+- Check if user session is working
+  run `rails s` to start server
+
+in different console but in app run
+
+```
+curl --header "Content-Type: application/json" --request POST --data '{"user": {"email": "hack@gmail.com", "password": "101010"}}' http://localhost:3000/sessions
+```
+
+CONFIRMATION:
+
+```
+{"status":"created","logged_in":true,"user":{"id":1,"email":"hack@gmail.com","password_digest":"$2a$12$rd6JFpuO.xEURRNXWy3ov.60zKKx6SeB5AXNccoyQFXZVuDD8mnfa","created_at":"2020-08-26T19:47:41.279Z","updated_at":"2020-08-26T19:47:41.279Z"}}
+```
+
+# Create Registration Controller
+
+in `config/routes`
+
+```
+resources :registrations, only: [:create]
+```
+
+in `app/controllers/registrations_controller.rb`
+
+```
+class RegistrationsController < ApplicationController
+
+    def create
+
+        if params['user']['password'] != params['user']['password_confirmation']
+            render json: {
+                status: "Passwords Dont Match"
+            }
+         elsif User.where(email: params['user']['email']).first
+            render json: {
+                status: "Email Matches Current User"
+            }
+        elsif params['user']['password'].length < 6
+            render json: {
+                status: "Password Must Contain More Than 6 Characters"
+            }
+        else user = User.create!(
+                email: params['user']['email'],
+                password: params['user']['password'],
+                password_confirmation: params['user']['password_confirmation']
+            )
+            if user
+                session[:user_id] = user.id
+                render json: {
+                    status: :created,
+                    user: user
+            }
+            else
+                render json: {status: 500, text: "not working"}
+            end
+        end
+    end
+end
+```
+
+- Check if user registration is working
+  run `rails s` to start server
+
+in different console but in app run
+
+```
+curl --header "Content-Type: application/json" --request POST --data '{"user": {"email": "bore@gmail.com", "password": "101010", "password_confirmation": "101010"}}' http://localhost:3000/registrations
+```
+
+CONFIRMATION:
+
+```
+{"status":"created","user":{"id":2,"email":"bore@gmail.com","password_digest":"$2a$12$./ztD8WeBdK07tVcqTWSROUNzHycSECs94p2Evdk0l0uP0rxvC1Di","created_at":"2020-08-27T17:49:53.820Z","updated_at":"2020-08-27T17:49:53.820Z"}}
+```
+
+- You can also confirmation by going to `http://localhost:3000/users`, the new user should appear
